@@ -2,6 +2,7 @@
 Python Client Compatible with k.LAB 1.0
 
 A Python client library to interact with running k.LAB Services. k.LAB services is a complete reimplementation of the legacy k.LAB software stack allowing modellers and developers to create and distributed digital twins and share those. 
+This Python Client is a client rewrite of [this](https://github.com/integratedmodelling/klab-client-python) client.
 This Client allows researchers to interact with the k.LAB services in Python and build their applications on top of it. They can leverage the benefits of the Python community and advanced Scientific libraries. 
 
 
