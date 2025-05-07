@@ -18,3 +18,6 @@ class KlabInternalErrorException(Exception):
 
 class KlabResourceNotFoundException(Exception):
     """Custom exception for klab resources not found error, to be extended if necessary."""
+
+class KlabAuthException(Exception):
+    """Custom exception for klab auth error, to be extended if necessary."""

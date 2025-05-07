@@ -1,7 +1,8 @@
-from reasoner.reasoner import ReasonerServiceClient
-from resolver.resolver import ResolverServiceClient
-from runtime.runtime import RuntimeServiceClient
-from resources.resources import ResourcesServiceClient
+from .reasoner.reasoner import ReasonerServiceClient
+from .resolver.resolver import ResolverServiceClient
+from .runtime.runtime import RuntimeServiceClient
+from .resources.resources import ResourcesServiceClient
+from .commons.logger import logger
 
 
 class Client(ReasonerServiceClient, 
@@ -26,30 +27,33 @@ class Client(ReasonerServiceClient,
                  username:str=None,
                  password:str=None
                 ):
-        
-        self.logger.info("--- Authenticating Once for all the Individual Service Client ---")
+
+        logger.info("--- Authenticating Once for all the Individual Service Client ---")
 
         self.authenticate(username=username, password=password)
+
+        if debug:
+            logger.info("Setting Log Level to DEBUG")
+            logger.setLevel("DEBUG")
        
-        self.logger.info("--- Initiating k.LAB Service Clients ---")
 
         '''
         Inits Reasoner Service Client
         '''
-        ReasonerServiceClient(url=reasonerServerEndpoint,debug=debug)
+        ReasonerServiceClient(url=reasonerServerEndpoint)
         
         '''
         Inits Runtime Service Client
         '''
-        RuntimeServiceClient(url=runtimeServerEndpoint, debug=debug)
+        RuntimeServiceClient(url=runtimeServerEndpoint)
         
         '''
-        Resources Service Client
+        Inits Resources Service Client
         '''
-        ResourcesServiceClient(url=resourcesServerEndpoint, debug=debug)
+        ResourcesServiceClient(url=resourcesServerEndpoint)
 
         '''
-        Resolver Service Client
+        Inits Resolver Service Client
         '''
-        ResolverServiceClient(url=resolverServerEndpoint, debug=debug)
+        ResolverServiceClient(url=resolverServerEndpoint)
         

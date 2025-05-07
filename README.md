@@ -11,4 +11,4 @@ This README assumes knowledge of k.LAB and semantic modeling. An introduction to
 
 ### Development
 
-Any and every piece of code should be well tested, and the test coverage should atleast be 60% any point in time. The linters are marked as required checks
+Any and every piece of code should be well tested, and the test coverage should atleast be 60% any point in time. The linters are marked as required checks.

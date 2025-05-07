@@ -1,6 +1,7 @@
 from pydantic import BaseModel
 
 class UserScope(BaseModel):
+    
     pass
 
 class SessionScope(BaseModel):
