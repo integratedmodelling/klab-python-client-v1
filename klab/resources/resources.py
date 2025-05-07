@@ -1,6 +1,7 @@
 
 from klab.commons.services import KLabServiceClient, KLabServiceType
 from enum import Enum
+from klab.commons.logger import logger
 
 
 class ResourcesServiceClient(KLabServiceClient):
@@ -47,7 +48,7 @@ class ResourcesServiceClient(KLabServiceClient):
 
     def __init__(self, url:str):
         super(serviceType = KLabServiceType.RESOLVER, url = url)
-        self.logger.info("Init Resources Service Client")
+        logger.info("Init Resources Service Client")
 
         if not self.online():
-            self.logger.error("Resources Server is not Online, Exiting")
+            logger.error("Resources Server is not Online, Exiting")
