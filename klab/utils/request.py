@@ -4,10 +4,10 @@ import logging
 from typing import Any
 from dataclasses import asdict
 
+
 class RequestUtils:
     '''
-    Class warps over the Requests (GET/ POST/ PATCH) with headers injected in the requests.
-    Note, these are all static methoids and hence no need to create an instance of this class.
+    Warps over the Requests (GET/ POST/ PATCH) with headers injected in the requests.
     '''
 
     def getUserAgent(self)->str:
@@ -57,7 +57,6 @@ class RequestUtils:
     def get(endpoint: str, parameters: list = None):
         '''
         Warps over the generic requests.get exposed by the requests library.
-        We could have overridden the implementation of get however not doing this now.
         '''
 
         mediaType = "application/json"
@@ -97,16 +96,11 @@ class RequestUtils:
         requestUrl = RequestUtils.makeUrl(endpoint)
 
         try:
-            print (asdict(data))
             headers["Accept"] = "application/json"
             response = requests.post(requestUrl, json=asdict(data))
             response.raise_for_status()
-        except Exception as err:
-            print (response.json())
-            raise err
-        else:
-            print(response.status_code)
-            print (response)
-
             jsonResponse = response.json()
             return jsonResponse
+        
+        except Exception as err:
+            raise err

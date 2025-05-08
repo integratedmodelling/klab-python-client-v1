@@ -12,16 +12,17 @@ class ResolverServiceClient(KLabServiceClient):
         RESOLVE_OBSERVATION = "/resolve"
 
     def __init__(self, url:str):
-        super(serviceType = KLabServiceType.RESOLVER, url = url)
+        super().__init__(serviceType = KLabServiceType.RESOLVER, url = url)
         logger.info("Init Resolver Service Client")
 
         if not self.online():
-            logger.error("Resolver Service is not Online, Exiting")
+            logger.error("Resolver Server is not Online")
 
-        try:  
-            logger.debug("Adding Service Details..")
-            self.add_details()
-            logger.info(f"Found ServiceId: {self.serviceDetails.serviceId}")
+        else:
+            try:  
+                logger.debug("Adding Resolver Service Details..")
+                self.add_details()
+                logger.info(f"Found ServiceId: {self.serviceDetails.serviceId}")
 
-        except Exception as e:
-            raise e
+            except Exception as e:
+                raise e
