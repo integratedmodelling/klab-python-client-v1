@@ -47,8 +47,17 @@ class ResourcesServiceClient(KLabServiceClient):
 
 
     def __init__(self, url:str):
-        super(serviceType = KLabServiceType.RESOLVER, url = url)
+        super().__init__(serviceType = KLabServiceType.RESOURCES, url = url)
         logger.info("Init Resources Service Client")
 
         if not self.online():
             logger.error("Resources Server is not Online, Exiting")
+
+        else:
+            try:  
+                logger.debug("Adding Resources Service Details..")
+                self.add_details()
+                logger.info(f"Found ServiceId: {self.serviceDetails.serviceId}")
+
+            except Exception as e:
+                raise e

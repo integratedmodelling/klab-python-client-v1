@@ -3,6 +3,10 @@ PUBLIC_BASE = API_BASE + "/public"
 CAPABILITIES = PUBLIC_BASE + "/capabilities"
 STATUS_BASE = PUBLIC_BASE + "/status"
 
+
+MEDIA_TYPE_JSON = "application/json"
+MEDITA_TYPE_XML = "application/xml"
+
 KLAB_VERSION = "1.0.0"
 '''
 New k.LAB version post rewriting of the entire software stack. 

@@ -1,16 +1,16 @@
 from pydantic import BaseModel
 from enum import Enum
-import requests
 from dataclasses import dataclass
-from typing import Literal
-import urllib.parse
+import requests
 from .logger import logger
 from ..exceptions import *
-from ..utils.request_utils import *
-from ..utils.file_utils import *
+from ..utils.request import RequestUtils
+from ..utils.file import FileUtils
+from ..utils.string import strUtils
+from ..utils.json import JSONutils
 from ..utils.consts import KLAB_VERSION, USER_AGENT_PLATFORM
 
-
+## Certificate Constants
 CERT_KEY_USERNAME = "klab.username"
 CERT_KEY_SIGNATURE = "klab.signature"
 CERT_KEY_CERTIFICATE_TYPE = "klab.certificate.type"
@@ -19,11 +19,16 @@ CERT_KEY_LEVEL = "klab.certificate.level"
 CERT_KEY_AGREEMENT = "klab.agreement"
 CERT_KEY_USER_EMAIL = "klab.user.email"
 CERT_PARTNER_HUB = "klab.partner.hub"
+
+## Hub Stuff
 HUB_AUTH_ENDPOINT = "/api/v2/engines/auth-cert"
 DEFAULT_HUB_URL = "https://integratedmodelling.org/hub"
 
+## Status and Details related Endpoints common to all services
 AUTHENTICATE_USER = "/authentuicate" ## dummy
 PING_ENDPOINT = "/ping"
+STATUS_ENDPOINT = "/public/status"
+CAPABILITIES_ENDPOINT = "/public/capabilities"
 
 class KLabServiceType(Enum):
     '''
@@ -54,7 +59,7 @@ class KLabServiceType(Enum):
     '''
 
 @dataclass
-class service(BaseModel):
+class ServiceDetails:
     '''
     Common model to hold the Service related details.
     This comes from /public/capabilities api
@@ -62,11 +67,11 @@ class service(BaseModel):
     serviceId: str
     serverId: str
     url: str
-    serviceType: KLabServiceType
+    serviceType: KLabServiceType = None
 
 
 @dataclass
-class serviceStatus(BaseModel):
+class ServiceStatus:
     '''
     Common model to hold the Service Status if the Service is available, and operational.
     This comes from the /public/status api
@@ -75,7 +80,7 @@ class serviceStatus(BaseModel):
     operational: bool
 
 @dataclass
-class UserAuthRequest:
+class UserAuthData:
     '''
     Common model to hold the User Auth Request details.
     This is used to make a call to hub api to get the User Scope
@@ -94,7 +99,9 @@ class KLabServiceClient():
     '''
     Common KLab Service Client Class with methods that are basic.
     Every Klab Service whilke creating the client would check if 
-    the server is online and get the ServiceId, ServerId
+    the server is online and get the ServiceId, ServerId.
+
+    Every Individual Service Client would inherit from this class
     '''
 
     def __init__(self,
@@ -123,21 +130,20 @@ class KLabServiceClient():
 
         match serviceType:
             case KLabServiceType.REASONER:
-                return f"{localhost}:8091"
+                return f"{localhost}:8091/reasoner"
             
             case KLabServiceType.RESOURCES:
-                return f"{localhost}:8092"
+                return f"{localhost}:8092/resources"
             
             case KLabServiceType.RESOLVER:
-                return f"{localhost}:8093"
+                return f"{localhost}:8093/resolver"
             
             case KLabServiceType.RUNTIME:
-                return f"{localhost}:8094"
+                return f"{localhost}:8094/runtime"
             
             case _:
                 raise KlabIllegalArgumentException(f"Unknown Service type: {serviceType}")
     
-
     def authenticate(self, 
                      username:str=None, 
                      password:str=None):
@@ -156,24 +162,23 @@ class KLabServiceClient():
         parsedCert = FileUtils.parseCertFile()
         logger.info(f"Attempting to Authenticate {parsedCert.get(CERT_KEY_USERNAME, "")} with Hub")
         try:
-            print(parsedCert)
             hubAuthResponse = RequestUtils.post(
                 #TODO: Check why partner hub url is havibg :/ such things 
                 endpoint = parsedCert.get("dummy", DEFAULT_HUB_URL) + HUB_AUTH_ENDPOINT, 
-                data = UserAuthRequest(
+                data = UserAuthData(
                     name = parsedCert.get(CERT_KEY_USERNAME, None),
                     key = parsedCert.get(CERT_KEY_SIGNATURE, None),
                     userType = parsedCert.get(CERT_KEY_CERTIFICATE_TYPE, None),
-                    certificate = parsedCert.get(CERT_KEY_CERTIFICATE, None),
+                    certificate = strUtils.remove_escape_char(parsedCert.get(CERT_KEY_CERTIFICATE, None)),
                     level = parsedCert.get(CERT_KEY_LEVEL, None),
                     idAgreement = parsedCert.get(CERT_KEY_AGREEMENT, None),
                     email = parsedCert.get(CERT_KEY_USER_EMAIL, None),
                 )
             )
-            print (hubAuthResponse)
+            logger.info(f"User {parsedCert.get(CERT_KEY_USERNAME, "")} Authenticated Successfully with Hub")
 
-        except KlabAuthException as e:
-            logger.error(f"Authentication Failed: {e}")    
+        except Exception as e:
+            raise KlabAuthException(f"Error while authenticating with Hub: {e}") 
 
 
     def online(self)->bool:
@@ -181,15 +186,20 @@ class KLabServiceClient():
         Checks if the specified service is online making a call to the /public/status api
         '''
 
-        resp = requests.get(url=self.url)
-        ## if not 200 then either the server is down or the endpoint is wrong
-        if resp.status_code == 200:
-            logger.error("Please check if the server is up or if the endpoint is correct")
-            return False
-
-        resp_json = resp.json()
-        status = self.serviceStatus(**resp_json)
-        return status.available and status.operational
+        logger.info("Found URL: " + self.url)
+        try:
+            resp = requests.get(url=self.url+STATUS_ENDPOINT)
+            ## if not 200 then either the server is down or the endpoint is wrong
+            if resp.status_code != 200:
+                logger.error("Please check if the server is up or if the endpoint is correct")
+                return False
+            resp_json = resp.json()
+            logger.info(f"Response from /public/status: {resp_json}")
+            status = JSONutils.JSON2Class(resp_json, ServiceStatus)
+            return  status.available and status.operational
+        
+        except Exception as e:
+            logger.error(f"Service at {self.url} is not online or not reachable, error: {e}")
 
 
     def add_details(self):
@@ -197,10 +207,10 @@ class KLabServiceClient():
         Gets Server and Service Id details from the /capabilities endpoint
         '''
 
-        resp = requests.get(url=self.url)
-        if resp.status_code == 200:
-            raise Exception("Please check if the server is up or the endpoint is correct")
+        resp = requests.get(url=self.url+CAPABILITIES_ENDPOINT)
+        if resp.status_code != 200:
+            raise Exception("Failed to get Service Details") ## This state should not happen since it should have failed in isOnline check
 
         resp_json = resp.json()
-        service = self.service(**resp_json)
-        self.serviceDetails = service
+        serviceDetails = JSONutils.JSON2Class(resp_json, ServiceDetails)
+        self.serviceDetails = serviceDetails
