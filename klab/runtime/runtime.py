@@ -1,12 +1,12 @@
-from klab.commons.services import KLabServiceClient, KLabServiceType
-from klab.commons.logger import logger
+from klab.services import KLabServiceClient, KLabServiceType
+from klab.logger import logger
 from ..exceptions import *
 
 class RuntimeServiceClient(KLabServiceClient):
     
     def __init__(self, url:str):
         super().__init__(serviceType = KLabServiceType.RUNTIME, url = url)
-        logger.info("Init Runtime Service Client")
+        logger.info("Init Runtime Service Client for")
 
         if not self.online():
             logger.error("Runtime Server is not Online")

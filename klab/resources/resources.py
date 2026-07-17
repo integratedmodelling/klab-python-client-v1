@@ -1,7 +1,7 @@
 
-from klab.commons.services import KLabServiceClient, KLabServiceType
+from klab.services import KLabServiceClient, KLabServiceType
 from enum import Enum
-from klab.commons.logger import logger
+from klab.logger import logger
 
 
 class ResourcesServiceClient(KLabServiceClient):

@@ -2,7 +2,7 @@ from .reasoner.reasoner import ReasonerServiceClient
 from .resolver.resolver import ResolverServiceClient
 from .runtime.runtime import RuntimeServiceClient
 from .resources.resources import ResourcesServiceClient
-from .commons.logger import logger
+from .logger import logger
 
 
 class Client(ReasonerServiceClient, 
@@ -23,6 +23,7 @@ class Client(ReasonerServiceClient,
                  runtimeServerEndpoint:str=None,
                  resourcesServerEndpoint:str=None,
                  resolverServerEndpoint:str=None,
+                 digitalTwinURL:str=None,
                  debug:bool=False,
                  username:str=None,
                  password:str=None
