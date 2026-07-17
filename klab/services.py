@@ -1,14 +1,16 @@
 from pydantic import BaseModel
 from enum import Enum
 from dataclasses import dataclass
+from typing import Tuple, List
 import requests
+import json
 from .logger import logger
-from ..exceptions import *
-from ..utils.request import RequestUtils
-from ..utils.file import FileUtils
-from ..utils.string import strUtils
-from ..utils.json import JSONutils
-from ..utils.consts import KLAB_VERSION, USER_AGENT_PLATFORM
+from .exceptions import *
+from .utils.request import RequestUtils
+from .utils.file import FileUtils
+from .utils.string import strUtils
+from .utils.json import JSONutils
+from .utils.consts import KLAB_VERSION, USER_AGENT_PLATFORM
 
 ## Certificate Constants
 CERT_KEY_USERNAME = "klab.username"
@@ -20,15 +22,21 @@ CERT_KEY_AGREEMENT = "klab.agreement"
 CERT_KEY_USER_EMAIL = "klab.user.email"
 CERT_PARTNER_HUB = "klab.partner.hub"
 
+## Federation Keys
+FEDERATION_BROKER_URL_KEY = "federation.broker.url"
+FEDERATION_ID_KEY = "federation.id"
+
 ## Hub Stuff
 HUB_AUTH_ENDPOINT = "/api/v2/engines/auth-cert"
 DEFAULT_HUB_URL = "https://integratedmodelling.org/hub"
+ANONYMOUS_USER = "anonymous"
 
 ## Status and Details related Endpoints common to all services
 AUTHENTICATE_USER = "/authentuicate" ## dummy
 PING_ENDPOINT = "/ping"
 STATUS_ENDPOINT = "/public/status"
 CAPABILITIES_ENDPOINT = "/public/capabilities"
+CREATE_SESSION_ENDPOINT = "/createSession"
 
 class KLabServiceType(Enum):
     '''
@@ -38,8 +46,8 @@ class KLabServiceType(Enum):
 
     REASONER = "REASONER"
     '''
-    Reasoner Service: Provides Reasoning Capabilities over ABox (Written in Kim).
-    The TBox is in https://github.com/integratedmodelling/odo-im
+    Reasoner Service: Provides Reasoning Capabilities i.e. to find if Concept A IS Concept B, or Concept A Is Compatible with Concept B
+    The system internally uses HERMIT Reasoner
     '''
 
     RESOLVER = "RESOLVER"
@@ -67,6 +75,7 @@ class ServiceDetails:
     serviceId: str
     serverId: str
     url: str
+    brokerURI: str
     serviceType: KLabServiceType = None
 
 
@@ -104,6 +113,17 @@ class KLabServiceClient():
     Every Individual Service Client would inherit from this class
     '''
 
+    @dataclass
+    class federation():
+        '''
+        Dataclass to hold the AMQP Broker URL and ID for the Federation
+        The central component to make the Digital Twin system work like a 
+        Shared Computer.
+        '''
+
+        id: str = None
+        broker_url: str = None
+
     def __init__(self,
                  serviceType: KLabServiceType,
                  url:str):
@@ -119,6 +139,7 @@ class KLabServiceClient():
 
         while self.url.endswith("/"):
             self.url = self.url[0:-1]
+
 
     
     def get_default_url(self, serviceType:KLabServiceType)->str:
@@ -146,24 +167,24 @@ class KLabServiceClient():
     
     def authenticate(self, 
                      username:str=None, 
-                     password:str=None):
+                     password:str=None)->Tuple[federation, str]:
         '''
         Authenticates the user to perform operations using the client.
         For local servers, no auth is necessary since the server if starts
         successfully authenticates.
-        For remote server, auth is necessary and this implements that
+        For remote server, auth is necessary and this implements that.
+
+        Returns an UserScope
         '''
 
         ## TODO: At the moment, we are just considering Auth only with Hub, and not 
         ## with UserName and Password. Possibly auth with username and password would need some 
         ## understanding of keycloak
         
-        logger.info("Authenticating Client using Certificate")
         parsedCert = FileUtils.parseCertFile()
-        logger.info(f"Attempting to Authenticate {parsedCert.get(CERT_KEY_USERNAME, "")} with Hub")
+        logger.info(f"Attempting to Authenticate User {parsedCert.get(CERT_KEY_USERNAME, "")} with Hub")
         try:
             hubAuthResponse = RequestUtils.post(
-                #TODO: Check why partner hub url is havibg :/ such things 
                 endpoint = parsedCert.get("dummy", DEFAULT_HUB_URL) + HUB_AUTH_ENDPOINT, 
                 data = UserAuthData(
                     name = parsedCert.get(CERT_KEY_USERNAME, None),
@@ -175,7 +196,37 @@ class KLabServiceClient():
                     email = parsedCert.get(CERT_KEY_USER_EMAIL, None),
                 )
             )
-            logger.info(f"User {parsedCert.get(CERT_KEY_USERNAME, "")} Authenticated Successfully with Hub")
+
+            userData = hubAuthResponse["userData"]
+            #logger.info(hubAuthResponse["userData"].keys())
+            #print(json.dumps(hubAuthResponse, indent=2))
+            #logger.info(hubAuthResponse["userData"]["token"])
+            logger.info(f"User {userData.get("identity", {}).get("id", "anonymous")} Authenticated Successfully with Hub")
+
+            federationID, federationBrokerURL = None, None
+
+            for group in hubAuthResponse["userData"].get("groups", []):
+                customProperties = group.get("customProperties", [])
+                for item in customProperties:
+                    if item.get("key", None) == FEDERATION_ID_KEY and item.get("value", None) == True:
+                        logger.info(f"Found User: {userData.get("identity", {}).get("id", ANONYMOUS_USER)} part of Federation: {key}")
+                        federationID = group.get("id")
+                    
+                    if item.get("key", None) == FEDERATION_BROKER_URL_KEY:
+                        federationBrokerURL = item.get("value")
+                    
+                    if federationID is not None and federationBrokerURL is not None:
+                        break
+                    
+            if len(hubAuthResponse.get("services", [])) > 0:
+                logger.info(f"The following Services are available to {userData.get("identity", {}).get("id", "anonymous")}")
+                for service in hubAuthResponse.get("services", []):
+                    logger.info(f"{service.get("id")}") 
+
+            return self.federation(
+                broker_url=federationBrokerURL,
+                id=federationID
+            ), userData.get("token")
 
         except Exception as e:
             raise KlabAuthException(f"Error while authenticating with Hub: {e}") 
@@ -185,8 +236,6 @@ class KLabServiceClient():
         '''
         Checks if the specified service is online making a call to the /public/status api
         '''
-
-        logger.info("Found URL: " + self.url)
         try:
             resp = requests.get(url=self.url+STATUS_ENDPOINT)
             ## if not 200 then either the server is down or the endpoint is wrong
@@ -194,7 +243,6 @@ class KLabServiceClient():
                 logger.error("Please check if the server is up or if the endpoint is correct")
                 return False
             resp_json = resp.json()
-            logger.info(f"Response from /public/status: {resp_json}")
             status = JSONutils.JSON2Class(resp_json, ServiceStatus)
             return  status.available and status.operational
         

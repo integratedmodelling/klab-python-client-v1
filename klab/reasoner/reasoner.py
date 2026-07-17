@@ -1,6 +1,6 @@
 
-from klab.commons.services import KLabServiceClient, KLabServiceType
-from klab.commons.logger import logger
+from klab.services import KLabServiceClient, KLabServiceType
+from klab.logger import logger
 from ..exceptions import *
 
 
@@ -11,7 +11,7 @@ class ReasonerServiceClient(KLabServiceClient):
     def __init__(self, url:str):
         super().__init__(serviceType = KLabServiceType.REASONER, url = url)
         
-        logger.info("Initializing Reasoner Service Client")
+        logger.info("Initializing Reasoner Service Client for")
 
         if not self.online():
             logger.error("Can't Init; Reasoner Service is not Online")
